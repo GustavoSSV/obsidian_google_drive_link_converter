@@ -1,114 +1,68 @@
-import {
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo,
-	Modal,
-	Notice,
-	Plugin,
-} from 'obsidian';
-import {
-	DEFAULT_SETTINGS,
-	MyPluginSettings,
-	SampleSettingTab,
-} from './settings';
+import { Editor, Notice, Plugin } from 'obsidian';
+import { driveLinkConverter, obsidianSyntax, driveLinkIFrame } from './drive';
+import { DriveModal, MidiaModal } from './modal';
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings!: MyPluginSettings;
-
+export default class DriveEmbedPlugin extends Plugin {
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (_evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.addRibbonIcon('link', 'Google Drive Link Converter', (_evt: MouseEvent) => {
+			const editor = this.app.workspace.activeEditor?.editor;
+			if (editor) {
+				this.abrirModalImagem(editor);
+			} else {
+				new Notice("Abra uma nota primeiro");
+			}
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+		this.addCommand({
+			id: "converter-link-drive",
+			name: "Converter link do Google Drive selecionado",
+			editorCallback: (editor) => {
+				const selecionado = editor.getSelection();
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			},
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (
-				editor: Editor,
-				_ctx: MarkdownView | MarkdownFileInfo,
-			) => {
-				editor.replaceSelection('Sample editor command');
-			},
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView =
-					this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+				try {
+					const linkEmbed = driveLinkConverter(selecionado);
+					const resultado = obsidianSyntax(linkEmbed);
+					editor.replaceSelection(resultado);
+				} catch (erro) {
+					new Notice("Link inválido");
 				}
-				return false;
 			},
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(activeDocument, 'click', (_evt: MouseEvent) => {
-			new Notice('Click');
+		this.addCommand({
+			id: "inserir-imagem-drive",
+			name: "Inserir imagem do Google Drive",
+			editorCallback: (editor) => this.abrirModalImagem(editor),
 		});
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000),
-		);
+		this.addCommand({
+			id: "inserir-midia-drive",
+			name: "Inserir mídia do Google Drive como iframe",
+			editorCallback: (editor) => this.abrirModalMidia(editor),
+		});
 	}
-
-	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<MyPluginSettings>,
-		);
+	abrirModalImagem(editor: Editor) {
+		new DriveModal(this.app, (link, formato) => {
+			try {
+				const linkEmbed = driveLinkConverter(link);
+				if (formato === "imagem") {
+					editor.replaceSelection(obsidianSyntax(linkEmbed));
+				} else {
+					editor.replaceSelection(linkEmbed);
+				}
+			} catch (erro) {
+				new Notice("Link inválido");
+			}
+		}).open();
 	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+	abrirModalMidia(editor: Editor) {
+		new MidiaModal(this.app, (link) => {
+			try {
+				const iframe = driveLinkIFrame(link);
+				editor.replaceSelection(iframe);
+			} catch (erro) {
+				new Notice("Link inválido");
+			}
+		}).open()
 	}
 }
