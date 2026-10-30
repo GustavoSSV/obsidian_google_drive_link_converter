@@ -1,8 +1,8 @@
 {
 	"id": "obsidian-drive-link-converter",
 	"name": "Drive Link Converter",
-	"version": "0.0.1",
-	"minAppVersion": "1.0.0",
+	"version": "0.0.2",
+	"minAppVersion": "1.4.4",
 	"description": "Converts Google Drive links to embed links in Obsidian.",
 	"author": "GustavoSSV",
 	"authorUrl": "https://github.com/GustavoSSV",

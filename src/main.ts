@@ -1,6 +1,6 @@
-import { Editor, Notice, Plugin } from 'obsidian';
+import { Editor, Notice, Plugin, TFile } from 'obsidian';
 import { driveLinkConverter, obsidianSyntax, driveLinkIFrame } from './drive';
-import { DriveModal, MidiaModal } from './modal';
+import { DriveModal, MidiaModal, PropriedadeModal } from './modal';
 
 export default class DriveEmbedPlugin extends Plugin {
 	async onload() {
@@ -40,6 +40,16 @@ export default class DriveEmbedPlugin extends Plugin {
 			name: "Inserir mídia do Google Drive como iframe",
 			editorCallback: (editor) => this.abrirModalMidia(editor),
 		});
+
+		this.addCommand({
+			id: "adicionar-propriedade-drive",
+			name: "Adicionar link do Google Drive a uma propriedade da nota",
+			editorCallback: (editor, ctx) => {
+				if (ctx.file) {
+					this.abrirModalPropriedade(ctx.file);
+				}
+			},
+		});
 	}
 	abrirModalImagem(editor: Editor) {
 		new DriveModal(this.app, (link, formato) => {
@@ -60,6 +70,26 @@ export default class DriveEmbedPlugin extends Plugin {
 			try {
 				const iframe = driveLinkIFrame(link);
 				editor.replaceSelection(iframe);
+			} catch (erro) {
+				new Notice("Link inválido");
+			}
+		}).open()
+	}
+	abrirModalPropriedade(arquivo: TFile) {
+		const frontmatter = this.app.metadataCache.getFileCache(arquivo)?.frontmatter ?? {};
+		const propriedades = Object.keys(frontmatter).filter(p => p !== "position");
+
+		new PropriedadeModal(this.app, propriedades, (link, propriedade) => {
+			try {
+				const linkEmbed = driveLinkConverter(link);
+				this.app.fileManager.processFrontMatter(arquivo, (fm: Record<string, unknown>) => {
+					fm[propriedade] = linkEmbed;
+				})
+				.then(() => new Notice(`Propriedade "${propriedade}" atualizada!`))
+				.catch((erro) => {
+					console.error("[Drive Embed] Erro ao salvar propriedade:", erro);
+					new Notice("Erro ao salvar a propriedade");
+				});
 			} catch (erro) {
 				new Notice("Link inválido");
 			}
